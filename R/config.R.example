@@ -1,0 +1,18 @@
+# Local machine configuration for this pipeline.
+#
+# 1. Copy this file to R/config.R ("R/config.R" is git-ignored: it holds
+#    only local paths and is never committed).
+# 2. Edit the two paths below for your own machine.
+#
+# See README.md for what is expected under each directory and where the
+# data comes from.
+
+# Root directory for all TerraClimate downloads and derived products used by
+# this pipeline: raw NetCDF downloads, climatologies, per-tile extraction
+# CSVs, agroclimatic index rasters, and analysis outputs.
+data_root <- "E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate"
+
+# Root directory for external reference GIS datasets not produced by this
+# pipeline: world administrative boundaries, the Winegrape Vineyard
+# Geodatabase, a global DEM, the Koppen-Geiger reference table...
+sig_root <- "E:/SIG"

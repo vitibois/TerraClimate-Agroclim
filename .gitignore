@@ -1,0 +1,28 @@
+# Data files (raw downloads, extracted tables, rasters) -- too large / not
+# meant to be distributed through this repository. See README for data sources.
+*.nc
+*.csv
+*.tif
+*.tiff
+*.gpkg
+*.shp
+*.shx
+*.dbf
+*.prj
+data/
+outputs/
+
+# Local machine configuration (paths) -- copy R/config.R.example to
+# R/config.R and edit it; R/config.R itself is not committed.
+R/config.R
+
+# R session / workspace files
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
