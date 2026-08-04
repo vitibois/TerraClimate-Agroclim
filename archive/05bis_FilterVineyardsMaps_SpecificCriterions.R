@@ -1,0 +1,241 @@
+
+# 2023-11-10, B. Bois 
+
+# Selection des régions viticoles potentielles en 2021-2020 et en 2050 (+2°C)
+# Sur la base de critères généraux définis avec Kees en septembre 2023
+
+# Les données sont filtrées selon des critères specifiques
+
+library(data.table)
+library(terra)
+library(ncdf4)
+library(ggplot2)
+
+setwd("E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/2023_WWV_ANALYSIS/")
+
+mydir <- "AAA_CognacCriterions"
+dir.create(mydir)
+dir.create(paste0(mydir,"/out_plots"))
+dir.create(paste0(mydir,"/out_tables"))
+dir.create(paste0(mydir,"/outmaps"))
+dir.create(paste0(mydir,"/rasters_zonespotentielles"))
+dir.create(paste0(mydir,"/rasters_zonespotentielles/2001-2020"))
+dir.create(paste0(mydir,"/rasters_zonespotentielles/plus2C"))
+dir.create(paste0(mydir,"/rasters_zonespotentielles/plus4C"))
+
+CritFile  <- "Criterions_cognac.csv"
+
+###### OBS one criterion map  #####
+mync_dir_obs <- "E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/AgroNetCDF"
+
+#### Thresholds
+th <- read.csv(CritFile)
+th <- th[!is.na(th$Rule),]
+myrules <- paste(paste(th$Index, th$Statistic.over.time, sep="_"),th$Sign,th$Rule)
+
+#### Identification of areas according to one criterion
+i <- 1
+myvar <- "HSI_Avg"
+myrule  <- "r < 33"
+r <- rast(paste0(mync_dir_obs, "/",myvar,"_OBS_2001-2020.nc"))
+rrules <- eval(parse(text = myrule))  
+rout <- r*rrules
+rout[rout < 10] <- NA
+plot(rout)
+plot(rrules)
+terra::plot(rrules, ext=ext(c(-20,40,30,70)))
+wld <- vect("E:/SIG/world/World_AdmBoundaries_Countries/world-administrative-boundaries.shp")
+vgdb <- vect("E:/SIG/world/Vineyards_GeoDB_2015/v1.2.3/Vineyard_GeoDB_v1.2.3.shp")
+vgdb.pt <- vect("E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/VGDB_Points_LouisDelelee/pts_global_v4.0.shp")
+plot(rrules, ext=ext(c(-20,40,30,70)))
+plot(wld, add=T)
+#plot(vgdb, add=T, col=rgb(0,0,1,0.5))
+
+# Pays du monde
+wld <- vect("E:/SIG/world/World_AdmBoundaries_Countries/world-administrative-boundaries.shp")
+
+ 
+#   # Fond google earth hybrid
+# hrge <- rast("GE_hybrid_0.04.tif")
+# crs(hrge) <- crs(rout)
+# hrge <- crop(hrge, rout)
+# hrge <- resample(hrge, rout)
+# hrge <- mask(hrge, r)
+# 
+#   # Eclaircir le raster (plus de luminosité)
+# palege <- hrge+50
+# palege[palege > 255] <- 255
+# plotRGB(palege, ext=ext(c(-10,20,35,60)))
+#   # enregistrement du fond GE_hybrid
+# writeRaster(palege, "PaleGE_hybrid_TerraClimResoluion.tif", overwrite=T)
+palege <- rast("PaleGE_hybrid_TerraClimResoluion.tif")
+
+# Zones actuellements plantées en vigne
+vpts <-  vect("E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/VGDB_Points_LouisDelelee/pts_global_v4.0.shp")
+
+
+###### OBS identification areas #####
+mync_dir_obs <- "E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/AgroNetCDF"
+
+#### Thresholds
+th <- read.csv(CritFile)
+th <- th[!is.na(th$Rule),]
+paste(paste(th$Index, th$Statistic.over.time, sep="_"),th$Sign,th$Rule)
+
+#### Identification of areas
+i <- 1
+myvar <- paste(th$Index[i], th$Statistic.over.time[i], sep="_")
+rout <- rast(paste0(mync_dir_obs, "/",myvar,"_OBS_2001-2020.nc"))
+rout <- rout*0+1
+plot(rout)
+
+pdf(paste0(mydir, "/outmaps/CarteCritereIndiv_OBS2001-2020.pdf"), width = 8, height = 6)
+  for(i in 1:nrow(th))
+  {
+    myvar <- paste(th$Index[i], th$Statistic.over.time[i], sep="_")
+    r <- rast(paste0(mync_dir_obs, "/",myvar,"_OBS_2001-2020.nc"))
+    myrule <-  paste("r",th$Sign,th$Rule)[i]
+    r2 <- eval(parse(text = myrule))  
+      mymaxcell <- 2*10^6
+      myext <- ext(c(-180,180,-75,85))
+      plotRGB(palege,  maxcell=mymaxcell, ext=myext, mar=c(3.1, 3.1, 2.1, 7.1),main=paste("Recent : 2001-2020\n\n",myvar,th$Sign[i],th$Rule[i]))
+      plot(wld, add=T, lwd=0.1, col=rgb(0,0,0,0.5))
+      plot(r2, add=T, alpha=0.5, maxcell=mymaxcell, ext=myext)
+      plot(vpts, add=T, cex=0.05, col=rgb(0,0,0,0.2))
+      sbar(d=5000,labels = c(0,2500,"5000 km"), halo = T,lonlat = T ,  ticks = T, cex=0.7)
+    rout <- rout*r2
+    r2[r2==0] <- NA
+    routval <- r*r2
+    writeRaster(routval, paste0(mydir,"/rasters_zonespotentielles/2001-2020/",myvar,"_ZonesPotentielles_OBS2001-2020.tif"), overwrite=T)
+  }
+dev.off()
+plot(rout)
+writeRaster(rout, paste0(mydir,"/rasters_zonespotentielles/AAA_ZonesPotentielles_OBS2001-2020.tif"), overwrite=T)
+rout[!rout] <- NA
+mycrds <- crds(rout)
+vout <- vect(mycrds, crs="epsg:4326")
+plot(wld) ;  plot(vout, add=T, col="forestgreen")
+writeVector(vout, paste0(mydir,"/rasters_zonespotentielles/AAA_ZonesPotentielles_OBS2001-2020.gpkg"), overwrite=T)
+
+###### PLUS 2 C identification areas #####
+mync_dir_obs <- "E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/AgroNetCDF/TerraClimate_2c_climatologies20y/"
+
+#### Thresholds
+th <- read.csv(CritFile)
+th <- th[!is.na(th$Rule),]
+th$Statistic.over.time <- sub("Mode","Avg",th$Statistic.over.time)
+
+#### Identification of areas
+i <- 1
+myvar <- paste(th$Index[i], th$Statistic.over.time[i], sep="_")
+rout <- rast(paste0(mync_dir_obs, "/",myvar,"_plus2_2042.nc"))
+rout <- rout*0+1
+
+pdf(paste0(mydir, "/outmaps/CarteCritereIndiv_plus2C.pdf"), width = 8, height = 6)
+  for(i in 1:nrow(th))
+  {
+    myvar <- paste(th$Index[i], th$Statistic.over.time[i], sep="_")
+    r <- rast(paste0(mync_dir_obs, "/",myvar,"_plus2_2042.nc"))
+    myrule <-  paste("r",th$Sign,th$Rule)[i]
+    r2 <- eval(parse(text = myrule))  
+      mymaxcell <- 2*10^6
+      mymaxcell <- 10^6
+      myext <- ext(c(-180,180,-75,85))
+      plotRGB(palege,  maxcell=mymaxcell, ext=myext, mar=c(3.1, 3.1, 2.1, 7.1),main=paste("+2°C\n\n",myvar,th$Sign[i],th$Rule[i]))
+      plot(wld, add=T, lwd=0.1, col=rgb(0,0,0,0.5))
+      plot(r2, add=T, alpha=0.5, maxcell=mymaxcell, ext=myext)
+      plot(vpts, add=T, cex=0.05, col=rgb(0,0,0,0.2))
+      sbar(d=5000,labels = c(0,2500,"5000 km"), halo = T,lonlat = T ,  ticks = T)
+    rout <- rout*r2
+    r2[r2==0] <- NA
+    routval <- r*r2
+    writeRaster(routval, paste0(mydir,"/rasters_zonespotentielles/plus2C/",myvar,"_ZonesPotentielles_plus2C.tif"), overwrite=T)
+    #plot(routval):plot(wld,add=T)
+  }
+dev.off()
+plot(rout)
+writeRaster(rout, paste0(mydir,"/rasters_zonespotentielles/AAA_ZonesPotentielles_plus2C.tif"), overwrite=T)
+rout[!rout] <- NA
+mycrds <- crds(rout)
+vout <- vect(mycrds, crs="epsg:4326")
+plot(wld) ;  plot(vout, add=T)
+writeVector(vout, paste0(mydir,"/rasters_zonespotentielles/AAA_ZonesPotentielles_plus2C.gpkg"), overwrite=T)
+
+
+###### PLUS 4 C identification areas #####
+mync_dir_obs <- "E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/AgroNetCDF/TerraClimate_4c_climatologies20y"
+
+#### Thresholds
+th <- read.csv(CritFile)
+th <- th[!is.na(th$Rule),]
+th$Statistic.over.time <- sub("Mode","Avg",th$Statistic.over.time)
+
+#### Identification of areas
+i <- 1
+myvar <- paste(th$Index[i], th$Statistic.over.time[i], sep="_")
+rout <- rast(paste0(mync_dir_obs, "/",myvar,"_plus4_2084.nc"))
+rout <- rout*0+1
+
+pdf(paste0(mydir, "/outmaps/CarteCritereIndiv_plus4C.pdf"), width = 8, height = 6)
+  for(i in 1:nrow(th))
+  {
+    myvar <- paste(th$Index[i], th$Statistic.over.time[i], sep="_")
+    r <- rast(paste0(mync_dir_obs, "/",myvar,"_plus4_2084.nc"))
+    myrule <-  paste("r",th$Sign,th$Rule)[i]
+    r2 <- eval(parse(text = myrule))  
+      mymaxcell <- 2*10^6
+      myext <- ext(c(-180,180,-75,85))
+      plotRGB(palege, maxcell=mymaxcell, ext=myext, mar=c(3.1, 3.1, 2.1, 7.1),main=paste("+4°C\n\n",myvar,th$Sign[i],th$Rule[i]))
+      plot(wld, add=T, lwd=0.1, col=rgb(0,0,0,0.5))
+      plot(r2, add=T, alpha=0.5, maxcell=mymaxcell, ext=myext)
+      plot(vpts, add=T, cex=0.05, col=rgb(0,0,0,0.2))
+      sbar(d=5000,labels = c(0,2500,"5000 km"), halo = T,lonlat = T ,  ticks = T)
+    rout <- rout*r2
+    r2[r2==0] <- NA
+    routval <- r*r2
+    writeRaster(routval, paste0(mydir,"/rasters_zonespotentielles/plus4C/",myvar,"_ZonesPotentielles_plus4C.tif"), overwrite=T)
+    #plot(routval):plot(wld,add=T)
+  }
+dev.off()
+plot(rout)
+writeRaster(rout, paste0(mydir,"/rasters_zonespotentielles/AAA_ZonesPotentielles_plus4C.tif"), overwrite=T)
+rout[!rout] <- NA
+mycrds <- crds(rout)
+vout <- vect(mycrds, crs="epsg:4326")
+plot(wld) ;  plot(vout, add=T)
+writeVector(vout, paste0(mydir,"/rasters_zonespotentielles/AAA_ZonesPotentielles_plus4C.gpkg"), overwrite=T)
+
+
+###### OBS and PLUS 2 C identification areas #####
+robs <- rast(paste0(mydir,"/rasters_zonespotentielles/AAA_ZonesPotentielles_OBS2001-2020.tif"))
+rp2 <- rast(paste0(mydir,"/rasters_zonespotentielles/AAA_ZonesPotentielles_plus2C.tif"))
+rout <- robs*rp2
+plot(rout)
+writeRaster(rout, paste0(mydir,"/rasters_zonespotentielles/AAA_ZonesPotentielles_OBS2001-2020&plus2C.tif"), overwrite=T)
+rout[!rout] <- NA
+mycrds <- crds(rout)
+vout <- vect(mycrds, crs="epsg:4326")
+plot(wld) ;  plot(vout, add=T, col="forestgreen")
+writeVector(vout, paste0(mydir,"/rasters_zonespotentielles/AAA_ZonesPotentielles_OBS2001-2020&plus2C.gpkg"), overwrite=T)
+
+
+
+##### CREATE BLUE WATER RESSOURCES ESTIMATES
+  #OBS
+rQ <- rast("E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/AgroNetCDF/Q_Avg_OBS_2001-2020.nc")
+rWWB <- rast("E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/AgroNetCDF/WWB_Avg_OBS_2001-2020.nc")
+bwat <- rWWB-200+rQ
+plot(bwat)
+writeCDF(bwat, "E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/AgroNetCDF/BlueWat_Avg_OBS_2001-2020.nc", overwrite=T, varname="bwat", unit="mm", longname="Blue Water Estimate")
+  # PLUS 2 C
+rQ <- rast("E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/AgroNetCDF/TerraClimate_2c_climatologies20y/Q_Avg_plus2_2042.nc")
+rWWB <- rast("E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/AgroNetCDF/TerraClimate_2c_climatologies20y/WWB_Avg_plus2_2042.nc")
+bwat <- rWWB-200+rQ
+plot(bwat)
+writeCDF(bwat, "E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/AgroNetCDF/TerraClimate_2c_climatologies20y/bwat_Avg_plus2_2042.nc", overwrite=T, varname="bwat", unit="mm", longname="Blue Water Estimate")
+  # PLUS 4 C
+rQ <- rast("E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/AgroNetCDF/TerraClimate_4c_climatologies20y/Q_Avg_plus4_2084.nc")
+rWWB <- rast("E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/AgroNetCDF/TerraClimate_4c_climatologies20y/WWB_Avg_plus4_2084.nc")
+bwat <- rWWB-200+rQ
+plot(bwat)
+writeCDF(bwat, "E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate/AgroNetCDF/TerraClimate_4c_climatologies20y/bwat_Avg_plus4_2084.nc", overwrite=T, varname="bwat", unit="mm", longname="Blue Water Estimate")

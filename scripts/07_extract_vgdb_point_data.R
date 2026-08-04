@@ -14,10 +14,10 @@ source("R/config.R")
 
 setwd(file.path(data_root, "AgroNetCDF"))
 
-# Winegrape Vineyard Geodatabase
-vgdbpath <- file.path(sig_root, "world/Wine_Vineyards_GeoDB/v2/v2.3",
-                       "Points_Winegrape_Vineyard_Geodatabase_V2.3.gpkg")
-vgdb.version <- sub("\\.gpkg", "", sub(".*Geodatabase_v", "", vgdbpath, ignore.case = TRUE))
+# Winegrape Vineyard Geodatabase (version set in R/config.R; scripts 08/09
+# read this script's output and must agree on the same version)
+vgdbpath <- file.path(sig_root, "world/Wine_Vineyards_GeoDB/v2", paste0("v", vgdb_version),
+                       paste0("Points_Winegrape_Vineyard_Geodatabase_V", vgdb_version, ".gpkg"))
 mypts <- vect(vgdbpath)
 mypts$CN_REG <- paste(mypts$CN, mypts$WINE_REGION, sep = "_")
 
@@ -95,7 +95,7 @@ for (mync_dir in mync_dirs) {
   bigout <- rbind(bigout, out)
 }
 
-dir_out <- file.path(data_root, "Extraction_TerraClimatPoints", paste0("VGDB_v", vgdb.version))
+dir_out <- file.path(data_root, "Extraction_TerraClimatPoints", paste0("VGDB_v", vgdb_version))
 dir.create(dir_out, recursive = TRUE, showWarnings = FALSE)
-name_out <- paste0("AgroIndices_TerraClimate_VGDB_Pts_v", vgdb.version, "AllPeriods.csv")
+name_out <- paste0("AgroIndices_TerraClimate_VGDB_Pts_v", vgdb_version, "AllPeriods.csv")
 data.table::fwrite(bigout, file.path(dir_out, name_out), row.names = FALSE)

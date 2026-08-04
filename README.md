@@ -41,16 +41,23 @@ Shared, reusable code lives in `R/`:
 - `R/tiling.R` - `make_pixel_tiles()` / `write_tile_list()`: splitting a
   global raster into batches for extraction.
 
-`archive/` keeps older superseded versions of some scripts (see their header
-comments), for traceability only - they are not maintained.
+Scripts 01-07 form the core extraction/computation pipeline; scripts 08-13
+are analysis/mapping scripts run on their output, and are closer to lab
+notebooks (manual scenario selection via a block of commented-out
+alternatives, one-off plots) than a fully automated pipeline.
+
+`archive/` keeps the original, unedited scripts that scripts 01-13 were
+migrated from, for traceability only - see `archive/README.md`. They are
+not maintained and several contain bugs that were fixed during the
+migration (see "Known limitations" below and the commit history).
 
 ## Setup
 
-1. R (>= 4.3) with the packages used across the scripts: `tidyverse`, `sf`,
-   `terra`, `tidyterra`, `geodata`, `data.table`, `Rfast`, `ncdf4`,
-   `downloader`, `elevatr`, `pacman`.
-2. Copy `R/config.R.example` to `R/config.R` and edit the two paths for your
-   own machine (`R/config.R` is git-ignored).
+1. R (>= 4.3) with the packages used across the scripts: `tidyverse`,
+   `ggplot2`, `sf`, `terra`, `tidyterra`, `geodata`, `data.table`, `Rfast`,
+   `ncdf4`, `downloader`, `elevatr`, `pacman`.
+2. Copy `R/config.R.example` to `R/config.R` and edit it for your own
+   machine (`R/config.R` is git-ignored).
 3. Run the scripts in `scripts/` in numeric order (each stage reads the
    previous stage's output - see the table above).
 
@@ -87,10 +94,19 @@ comments), for traceability only - they are not maintained.
 
 - The Gladstones Biologically Effective Degree Days (BEDD) index is not yet
   implemented (see the `TODO` placeholder in `R/agroclim_indices.R`).
-- Two small bugs present in the original scripts (incorrect days-in-month
-  used in the soil evaporation term of the Dryness Index) were fixed while
-  factoring the code into `R/agroclim_indices.R`; see `tests/` for a
-  regression check that quantifies and documents the fix.
+- A few bugs present in the original scripts were fixed while migrating the
+  code:
+  - Two small, independent bugs in the days-in-month used by the Dryness
+    Index's soil evaporation term (one in the annual pipeline, one in the
+    climatology pipeline) - see `tests/validate_agroclim_indices.R` for a
+    regression check that quantifies and documents the fix.
+  - A loop bug in the climatology-building script that silently skipped the
+    `tmin` variable when run non-interactively.
+  - A crashing bug (`ds$REG <- factor()`, an empty factor assigned to a
+    non-empty column) shared by scripts 08 and 09.
+  - `scripts/07_extract_vgdb_point_data.R`'s source had unused imports of
+    the retired/archived `rgdal` and `maptools` packages, which would block
+    installation on a recent R; these were dropped.
 
 ## License
 

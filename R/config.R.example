@@ -16,3 +16,10 @@ data_root <- "E:/Benjamin/_Recherches_Dijon/_AAA_TerraClimate"
 # pipeline: world administrative boundaries, the Winegrape Vineyard
 # Geodatabase, a global DEM, the Koppen-Geiger reference table...
 sig_root <- "E:/SIG"
+
+# Version of the Winegrape Vineyard Geodatabase (VGDB) currently in use.
+# Must match the "v<version>" folder in the vgdbpath used by
+# scripts/07_extract_vgdb_point_data.R -- scripts 08/09 read the point
+# extraction this produces (Extraction_TerraClimatPoints/VGDB_v<version>/...)
+# and need to agree on the same version.
+vgdb_version <- "2.3"
