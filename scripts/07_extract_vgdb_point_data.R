@@ -1,9 +1,11 @@
 # Extract agroclimatic index rasters (all periods/scenarios found under
-# AgroNetCDF/) and terrain features (elevation, slope) at the points of the
-# Winegrape Vineyard Geodatabase (VGDB).
+# AgroNetCDF/), terrain features (elevation, slope), and raw monthly climate
+# variables (one period at a time) at the points of the Winegrape Vineyard
+# Geodatabase (VGDB).
 #
 # Originally written by Benjamin Bois, 2023.
 # Reworked 2025-07-31, B. Bois: generalised to extract all periods directly.
+# Reworked 2026-09-03, B. Bois: added the monthly climate variables section.
 
 library(terra)
 library(sf)
@@ -99,3 +101,47 @@ dir_out <- file.path(data_root, "Extraction_TerraClimatPoints", paste0("VGDB_v",
 dir.create(dir_out, recursive = TRUE, showWarnings = FALSE)
 name_out <- paste0("AgroIndices_TerraClimate_VGDB_Pts_v", vgdb_version, "AllPeriods.csv")
 data.table::fwrite(bigout, file.path(dir_out, name_out), row.names = FALSE)
+
+## ---- monthly climate variables, one climatology period ------------------------
+# Extracts raw monthly tmin/tmax/ppt/pet (4 variables x 12 months = 48
+# columns) at VGDB points, for a single climatology period at a time -- pick
+# mync_dir/mync_prefix below (matching script 04's selection pattern; the
+# prefix is the one written by script 02_build_climatologies.R).
+
+# mync_dir <- "TerraClimate_2c_climatologies20y"
+# mync_prefix <- "TerraClimate2C_"
+
+# mync_dir <- "TerraClimate_4c_climatologies20y"
+# mync_prefix <- "TerraClimate4C_"
+
+# mync_dir <- "TerraClimate_obs8110_climatologies20y"
+# mync_prefix <- "TerraClimate19812010_"
+
+mync_dir <- "TerraClimate_obs0120_climatologies20y"
+mync_prefix <- "TerraClimate20012020_"
+
+# mync_dir <- "TerraClimate_obs6190_climatologies30y"
+# mync_prefix <- "TerraClimate19611990_"
+
+climatology_nc <- function(var) {
+  file.path(data_root, "Download_TerraClimate", "climatologies", mync_dir,
+            paste0(mync_prefix, var, ".nc"))
+}
+
+monthly_out <- data.frame(x = x, y = y, CN_REG = mypts$CN_REG)
+for (var in c("tmin", "tmax", "ppt", "pet")) {
+  mync <- rast(climatology_nc(var))
+  if (!"pixID" %in% names(monthly_out)) {
+    cells <- terra::extract(mync, mypts, cells = TRUE)
+    monthly_out <- cbind(pixID = cells$cell, monthly_out)
+  }
+  monthly_out <- cbind(monthly_out, terra::extract(mync, mypts)[, -1])
+}
+names(monthly_out) <- sub("Z1=", "", names(monthly_out))
+
+# A few VGDB points can fall in the same raster cell; keep one row per
+# unique location.
+monthly_out <- monthly_out[!duplicated(paste(monthly_out$x, monthly_out$y)), ]
+
+name_out_monthly <- paste0("MonthlyClimate_TerraClimate_VGDB_Pts_v", vgdb_version, "_", mync_dir, ".csv")
+data.table::fwrite(monthly_out, file.path(dir_out, name_out_monthly), row.names = FALSE)
