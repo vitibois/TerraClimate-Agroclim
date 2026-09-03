@@ -55,7 +55,7 @@ migration (see "Known limitations" below and the commit history).
 
 1. R (>= 4.3) with the packages used across the scripts: `tidyverse`,
    `ggplot2`, `sf`, `terra`, `tidyterra`, `geodata`, `data.table`, `Rfast`,
-   `ncdf4`, `downloader`, `elevatr`, `pacman`.
+   `ncdf4`, `downloader`, `elevatr`, `fst`, `pacman`.
 2. Copy `R/config.R.example` to `R/config.R` and edit it for your own
    machine (`R/config.R` is git-ignored).
 3. Run the scripts in `scripts/` in numeric order (each stage reads the

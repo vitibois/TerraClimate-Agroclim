@@ -145,3 +145,50 @@ monthly_out <- monthly_out[!duplicated(paste(monthly_out$x, monthly_out$y)), ]
 
 name_out_monthly <- paste0("MonthlyClimate_TerraClimate_VGDB_Pts_v", vgdb_version, "_", mync_dir, ".csv")
 data.table::fwrite(monthly_out, file.path(dir_out, name_out_monthly), row.names = FALSE)
+
+## ---- monthly climate variables, individual years ------------------------------
+# Same 48 monthly columns as above, but from the raw yearly (non-averaged)
+# NetCDF files -- one row per VGDB point per year. `scenario` is fixed to
+# "OBS" (all individual years are observed data, unlike the +2C/+4C
+# climatologies) and `year` is set from each file.
+
+individual_years_dir <- file.path(data_root, "Download_TerraClimate", "IndividualYears2001_2020")
+year_min <- 2001
+year_max <- 2020
+
+yearly_out <- c()
+for (year in year_min:year_max) {
+  year_out <- data.frame(x = x, y = y, CN_REG = mypts$CN_REG, scenario = "OBS", year = year)
+  for (var in c("tmin", "tmax", "ppt", "pet")) {
+    mync <- rast(file.path(individual_years_dir, paste0("TerraClimate_", var, "_", year, ".nc")))
+    if (!"pixID" %in% names(year_out)) {
+      cells <- terra::extract(mync, mypts, cells = TRUE)
+      year_out <- cbind(pixID = cells$cell, year_out)
+    }
+    year_out <- cbind(year_out, terra::extract(mync, mypts)[, -1])
+  }
+  names(year_out) <- sub("Z1=", "", names(year_out))
+  yearly_out <- rbind(yearly_out, year_out)
+  cat("Finished year", year, "-", date(), "\n")
+}
+
+# A few VGDB points can fall in the same raster cell; keep one row per
+# unique location and year.
+yearly_out <- yearly_out[!duplicated(paste(yearly_out$x, yearly_out$y, yearly_out$year)), ]
+
+dir_out <- file.path(data_root, "Extraction_TerraClimatPoints", paste0("VGDB_v", vgdb_version))
+dir.create(dir_out, recursive = TRUE, showWarnings = FALSE)
+
+name_out_yearly <- paste0("MonthlyClimate_TerraClimate_VGDB_Pts_v", vgdb_version,
+                          "_IndividualYears", year_min, "_", year_max, ".csv")
+data.table::fwrite(yearly_out, file.path(dir_out, name_out_yearly), row.names = FALSE)
+
+# yearly_out has one row per VGDB point per year (20x the row count of the
+# other extractions) -- also save it as .fst, a binary columnar format that
+# is both much smaller on disk and much faster to read back than the CSV
+# (see fst::read_fst()).
+name_out_yearly_fst <- paste0("MonthlyClimate_TerraClimate_VGDB_Pts_v", vgdb_version,
+                              "_IndividualYears", year_min, "_", year_max, ".fst")
+fst::write_fst(yearly_out, file.path(dir_out, name_out_yearly_fst))
+
+
