@@ -19,7 +19,15 @@ rast_TC <- rast(file.path("Download_TerraClimate", "tmin_2020.nc"))
 r_na <- rast_TC[[1]]
 values(r_na) <- NA
 
-myfun <- mean
+# The statistical mode (most frequent value across years), used for the
+# categorical KOPPEN classification -- an arithmetic mean of category codes
+# would not be meaningful. Still labelled "Avg" in output file names below,
+# for consistency with the other (genuinely averaged) indices.
+stat_mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
 funname <- "Avg"
 
 scenario <- "OBS"
@@ -31,16 +39,15 @@ if (scenario == "OBS") year2discard <- 2000
 mypath <- file.path(data_root, "AgroNetCDF")
 dir.create(mypath, showWarnings = FALSE)
 
-# TODO: KOPPEN is deliberately excluded here: it is a categorical code, so
-# averaging it across years (as done below for the other indices) is not
-# meaningful -- it would need a per-pixel mode instead.
 my_vars <- c("HI", "CI", "DI", "Q", "WWB", "WI", "ANT", "ANP",
              "GST", "GSP", "GST49", "GSP49", "DSP", "DST",
-             "RipeT", "RipeP", "FSP", "FST", "DORT", "SFR", "WCR", "HSI")
+             "RipeT", "RipeP", "FSP", "FST", "DORT", "SFR", "WCR", "HSI",
+             "KOPPEN")
 
 t_start <- Sys.time()
 # Roughly 5 to 8 minutes per index, depending on the computation involved.
 for (var in my_vars) {
+  myfun <- if (var == "KOPPEN") stat_mode else mean
   agg <- c()
   for (tile_id in tiles_df$ID) {
     df <- fread(file.path("TC_CSV_DATA",
