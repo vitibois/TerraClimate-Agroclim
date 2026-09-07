@@ -47,12 +47,21 @@ notebooks (manual scenario selection via a block of commented-out
 alternatives, one-off plots) than a fully automated pipeline.
 
 `scripts/14_climate_analogues_millesime.R` is a standalone analysis: it
-compares one local site's climate in a given year against every VGDB point's
-individual-year climate (script 07's "individual years" output) to find
-which of the world's wine regions most often show a similar vegetative-season
-climate. See `analogues_millesime.md` at the project root for the full
-statistical method (detrending, normal scores, pooled covariance metric,
-three concurrent estimators, mandatory diagnostics).
+compares one local weather station's climate in a given year against every
+VGDB point's individual-year climate (script 07's "individual years" output)
+to find which of the world's wine regions most often show a similar
+vegetative-season climate. The station is anchored to its nearest `WLD`
+point by geographic coordinates (haversine), calibrated against it via a
+station/pixel delta (additive for Tmin/Tmax, multiplicative for P/ET0), then
+scored with three concurrent estimators -- an empirical-Bayes NIW/Student
+predictive (main), a Gaussian-kernel density and an adaptive-kNN density
+(controls) -- aggregated into sequential regional cohorts (no regional
+centroids). See `00_note_migration.md`, `analogues_millesime.md` and
+`note_station_delta_carte.md` at the project root for the full method and
+mandatory diagnostics. `scripts/14b_controle_continuite_gaussien.R` is a
+one-off control script (not part of the pipeline) that reruns the older
+regularised-Gaussian estimator to check it still agrees with the current one
+(Spearman > 0.95 expected).
 
 `archive/` keeps the original, unedited scripts that scripts 01-13 were
 migrated from, for traceability only - see `archive/README.md`. They are
@@ -66,7 +75,14 @@ migration (see "Known limitations" below and the commit history).
    `ncdf4`, `downloader`, `elevatr`, `fst`, `pacman`.
 2. Copy `R/config.R.example` to `R/config.R` and edit it for your own
    machine (`R/config.R` is git-ignored).
-3. Run the scripts in `scripts/` in numeric order (each stage reads the
+3. Every script does `source("R/config.R")` with a path relative to this
+   project's root - so the R working directory must be this folder when a
+   script starts. Open `R_Project_TerraClimate_Agroclim.Rproj` (RStudio or
+   Positron both set the working directory to the project root when a
+   `.Rproj` is opened, or detected in the opened folder) rather than opening
+   individual `.R` files directly; from a shell, `cd` into this folder before
+   `Rscript scripts/<name>.R`.
+4. Run the scripts in `scripts/` in numeric order (each stage reads the
    previous stage's output - see the table above).
 
 ## Data sources

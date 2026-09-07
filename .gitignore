@@ -20,7 +20,6 @@ R/config.R
 .Rhistory
 .RData
 .Rproj.user/
-*.Rproj
 
 # OS files
 .DS_Store
