@@ -179,9 +179,9 @@ yearly_out <- yearly_out[!duplicated(paste(yearly_out$x, yearly_out$y, yearly_ou
 dir_out <- file.path(data_root, "Extraction_TerraClimatPoints", paste0("VGDB_v", vgdb_version))
 dir.create(dir_out, recursive = TRUE, showWarnings = FALSE)
 
-name_out_yearly <- paste0("MonthlyClimate_TerraClimate_VGDB_Pts_v", vgdb_version,
-                          "_IndividualYears", year_min, "_", year_max, ".csv")
-data.table::fwrite(yearly_out, file.path(dir_out, name_out_yearly), row.names = FALSE)
+# name_out_yearly <- paste0("MonthlyClimate_TerraClimate_VGDB_Pts_v", vgdb_version,
+#                           "_IndividualYears", year_min, "_", year_max, ".csv")
+# data.table::fwrite(yearly_out, file.path(dir_out, name_out_yearly), row.names = FALSE)
 
 # yearly_out has one row per VGDB point per year (20x the row count of the
 # other extractions) -- also save it as .fst, a binary columnar format that

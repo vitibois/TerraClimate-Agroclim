@@ -46,6 +46,14 @@ are analysis/mapping scripts run on their output, and are closer to lab
 notebooks (manual scenario selection via a block of commented-out
 alternatives, one-off plots) than a fully automated pipeline.
 
+`scripts/14_climate_analogues_millesime.R` is a standalone analysis: it
+compares one local site's climate in a given year against every VGDB point's
+individual-year climate (script 07's "individual years" output) to find
+which of the world's wine regions most often show a similar vegetative-season
+climate. See `analogues_millesime.md` at the project root for the full
+statistical method (detrending, normal scores, pooled covariance metric,
+three concurrent estimators, mandatory diagnostics).
+
 `archive/` keeps the original, unedited scripts that scripts 01-13 were
 migrated from, for traceability only - see `archive/README.md`. They are
 not maintained and several contain bugs that were fixed during the
