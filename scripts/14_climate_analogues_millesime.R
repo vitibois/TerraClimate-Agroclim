@@ -65,7 +65,7 @@ source("R/config.R")
 # -- WLD: world vineyard monthly climate, individual years (script 07 output)
 wld_path <- file.path(data_root, "Extraction_TerraClimatPoints", paste0("VGDB_v", vgdb_version),
                       paste0("MonthlyClimate_TerraClimate_VGDB_Pts_v", vgdb_version,
-                             "_IndividualYears2001_2020.fst"))
+                             "_IndividualYears2001_2025.fst"))
 
 # -- colonnes reelles de WLD -- A VERIFIER avec names(WLD) avant execution
 #    (note_station_delta_carte.md section B ; 00_note_migration.md section 5)
@@ -151,7 +151,7 @@ site_label <- tools::file_path_sans_ext(basename(loc_path))
 # (ex. "Pessac Haut Lafue Nord_20000101_20260901" -> "Pessac Haut Lafue Nord")
 station_name <- sub("_[0-9]{8}(_[0-9]{8})?$", "", site_label)
 
-dir_out <- file.path(data_root, "Analogues_Millesime", station_name)
+dir_out <- file.path(data_root, "Analogues_Millesime", paste(station_name, target_year))
 dir.create(dir_out, recursive = TRUE, showWarnings = FALSE)
 out_prefix <- file.path(dir_out, paste0("AnaloguesMillesime_", site_label, "_", target_year,
                                         if (cible_source == "pixel") "_pixel" else ""))
@@ -233,7 +233,7 @@ if (is.na(LOC_LON) || is.na(LOC_LAT)) {
 message("loading WLD: ", wld_path)
 WLD <- as.data.table(read_fst(wld_path))
 
-req <- c(COL_REGION, COL_LON, COL_LAT, "year")
+req <- c(COL_REGION, COL_LON, COL_LAT, "year", "pixID")
 if (!all(req %in% names(WLD)))
   stop("colonnes WLD manquantes : ", paste(setdiff(req, names(WLD)), collapse = ", "),
        "\nnames(WLD) = ", paste(head(names(WLD), 40), collapse = ", "))
@@ -249,7 +249,45 @@ if (!has_country) {
 }
 
 setnames(WLD, c(COL_LON, COL_LAT), c("lon", "lat"), skip_absent = TRUE)
+
+# -- 2.0 deduplication par pixel TerraClimate --------------------------------
+# Le semis VGDB (~1 point/km2) est bien plus dense que la grille TerraClimate
+# (~4 km) : plusieurs points VGDB tombent alors dans le meme pixel (meme
+# pixID) et portent des donnees climatiques STRICTEMENT IDENTIQUES. Les garder
+# tous gonflerait artificiellement l'effectif de ce pixel (poids indu dans la
+# covariance intra-site poolee, le KDE, le kNN et tous les comptages de
+# points) sans aucune information climatique supplementaire pour le CALCUL.
+# Un seul point est retenu par pixID ; si plusieurs CN_REG se partagent un
+# meme pixel, on garde celui qui y a le plus gros effectif (nombre de points
+# VGDB de ce pixel). Le nombre de points VGDB originaux derriere chaque pixel
+# retenu (n_pts_pixel) et le total original par region (region_totals_pts)
+# sont conserves : ils ne servent JAMAIS au calcul d'homologie, seulement au
+# rapport (section 9), pour dire a combien de points reels un pixel analogue
+# correspond.
+pts_uniq <- unique(WLD[, .(lon, lat, region = get(COL_REGION), pixID)])
+region_totals_pts <- pts_uniq[, .(n_pts_region = .N), by = region]
+
+eff <- pts_uniq[, .N, by = .(pixID, region)]
+setorder(eff, pixID, -N)
+maj <- eff[!duplicated(pixID), .(pixID, region_maj = region, n_pts_pixel = N)]
+pts_keep <- merge(pts_uniq, maj, by = "pixID")[region == region_maj]
+pts_keep <- pts_keep[!duplicated(pixID), .(lon, lat, n_pts_pixel)]   # ties within the majority region
+
+n_before <- nrow(pts_uniq)
+n_after  <- nrow(pts_keep)
+if (n_after < n_before) {
+  message("deduplication par pixel TerraClimate (pixID) : ", n_before, " -> ", n_after,
+          " points geographiques retenus pour le calcul (", n_before - n_after,
+          " doublons de pixel retires -- climat identique bit a bit ; en cas de CN_REG ",
+          "multiples sur un meme pixel, la region la plus representee dans ce pixel est ",
+          "conservee). Les effectifs de points originaux sont gardes pour le rapport.")
+} else {
+  message("aucun doublon de pixel TerraClimate detecte dans WLD")
+}
+WLD <- merge(WLD, pts_keep, by = c("lon", "lat"))
+
 WLD[, site := .GRP, by = .(lon, lat)]
+SITE_PTS <- unique(WLD[, .(site, n_pts_pixel)])   # section 9 : n_cohorte_pts, jamais le calcul
 
 # -- 2.1 appariement geographique station -> point WLD le plus proche --------
 # note_station_delta_carte.md section B. Rapprochement POINT A POINT (WLD est
@@ -347,6 +385,7 @@ if (length(na_sites) > 0) {
 
 stopifnot(all(VARS %in% names(D)), !anyNA(D[, ..VARS]))
 nn <- D[, .N, by = site]$N
+n_millesimes_typ <- as.integer(round(median(nn)))   # for report text (section 14); NOT hardcoded
 if (length(unique(nn)) != 1L)
   message("note: number of vintages per site is not constant (range ",
           paste(range(nn), collapse = "-"),
@@ -725,6 +764,7 @@ scorer_cible <- function(zb, etiquette = "") {
 }
 
 res <- scorer_cible(zb_corr, "cible corrigee")
+res <- merge(res, SITE_PTS, by = "site")   # n_pts_pixel : reporting seulement, cf. section 2.0
 message("degres de liberte a posteriori : ", res$df_post[1],
         "  (plus eleve = plus proche de la gaussienne)")
 
@@ -808,23 +848,28 @@ message("wrote ", paste0(out_prefix, "_table.csv"))
 # region, pas du bruit. Un analogue est UN LIEU.
 
 construire_cohortes <- function(res, N_REG = 10L) {
+  # n_cohorte_pix compte les PIXELS retenus (l'unite du calcul, dedupliquee en
+  # 2.0) ; n_cohorte_pts compte les points VGDB originaux qu'ils representent
+  # (region_totals_pts / n_pts_pixel, cf. section 2.0) -- utilises ICI
+  # seulement pour le rapport, jamais pour reponderer le classement.
   setorder(res, rg_cons)
   R <- copy(res)[, rang_pt := .I]
-  eff <- unique(R[, .(site, region)])[, .(n_region = .N), by = region]
 
   R[, bloc := rleid(region)]
-  COH <- R[, .(region    = region[1],
-               rang_deb  = min(rang_pt),
-               rang_fin  = max(rang_pt),
-               n_cohorte = .N,
-               rg_med    = median(as.double(rg_cons)),
-               solidite  = solidite[1]), by = bloc]
+  COH <- R[, .(region        = region[1],
+               rang_deb      = min(rang_pt),
+               rang_fin      = max(rang_pt),
+               n_cohorte_pix = .N,
+               n_cohorte_pts = sum(n_pts_pixel),
+               rg_med        = median(as.double(rg_cons)),
+               solidite      = solidite[1]), by = bloc]
   # une region peut reapparaitre plus loin : on garde son premier bloc
   COH <- COH[!duplicated(region)]
   setorder(COH, rang_deb)
   COH[, rang_region := .I]
-  COH <- merge(COH, eff, by = "region", all.x = TRUE)
-  COH[, pct_region := round(100 * n_cohorte / n_region, 1)]
+  COH <- merge(COH, region_totals_pts, by = "region", all.x = TRUE)
+  setnames(COH, "n_pts_region", "n_region_pts")
+  COH[, pct_region := round(100 * n_cohorte_pts / n_region_pts, 1)]
   setorder(COH, rang_region)
   head(COH, N_REG)[]
 }
@@ -846,8 +891,8 @@ mesurer_dispersion <- function(COH, res, DTw) {
   out <- merge(merge(COH, rgs, by = "region"), spr, by = "region")
   out[, profil := fifelse(pct_region >= 50, "region homogene et proche",
                   fifelse(pct_region >= 15, "part substantielle de la region",
-                  fifelse(n_cohorte  >= 5,  "sous-secteur localise",
-                                            "point isole - a signaler")))]
+                  fifelse(n_cohorte_pix >= 5, "sous-secteur localise",
+                                              "point isole - a signaler")))]
   setorder(out, rang_region)
   out[]
 }
@@ -863,8 +908,8 @@ SYN <- merge(SYN, n_proches_reg, by = "region", all.x = TRUE)
 setorder(SYN, rang_region)
 
 TAB_SYN <- SYN[, .(rang = rang_region, region, country,
-                   rang_deb, rang_fin, n_cohorte, n_region, pct_region,
-                   rg_med_reg, rg_q25, rg_q75, etalement, etal_p90,
+                   rang_deb, rang_fin, n_cohorte_pts, n_region_pts, pct_region,
+                   n_cohorte_pix, rg_med_reg, rg_q25, rg_q75, etalement, etal_p90,
                    n_proches, solidite, profil)]
 print(TAB_SYN)
 
@@ -1106,7 +1151,7 @@ build_carte <- function(regions_n, bbox_pts = NULL, titre = NULL) {
 reg_top   <- SYN$region
 map_pages <- list(build_carte(reg_top),
                   build_carte(reg_top, rbind(PT_TOP[, .(lon, lat)], loc_coord),
-                             paste0("Points analogues -- top ", length(regions_n), " regions")))
+                             paste0("Points analogues -- top ", length(reg_top), " regions")))
 for (rg in head(reg_top, n_zoom_regions)) {
   pts <- site_coords[region == rg, .(lon, lat)]
   map_pages <- c(map_pages, list(build_carte(reg_top, pts, paste0("Zoom -- ", rg))))
@@ -1237,7 +1282,8 @@ rapport_pdf <- function(chemin = file.path(dir_sorties, "rapport_analogues.pdf")
     "",
     "Estimateur principal : predictif bayesien a a priori empirique (NIW / Student).",
     "Score = statistique de classement ordinal, JAMAIS une probabilite.",
-    "Le top-1 parcellaire n'a aucune signification (20 millesimes en dimension 6).")
+    paste0("Le top-1 parcellaire n'a aucune signification (", n_millesimes_typ,
+           " millesimes en dimension ", K, ")."))
   text(0, seq(0.90, 0.35, length.out = length(txt)), txt, adj = 0, cex = .85)
 
   # p.2 tableau de synthese
@@ -1246,7 +1292,8 @@ rapport_pdf <- function(chemin = file.path(dir_sorties, "rapport_analogues.pdf")
     grid::grid.text("Synthese -- top 10 des regions (cohortes sequentielles)",
                     y = 0.95, gp = grid::gpar(fontsize = 14, fontface = "bold"))
     gridExtra::grid.table(TAB_SYN[, .(rang, region, rang_deb, rang_fin,
-                                      n_cohorte, n_region, pct_region, solidite, profil)],
+                                      n_cohorte_pts, n_region_pts, pct_region,
+                                      n_cohorte_pix, solidite, profil)],
                           rows = NULL)
   } else message("package gridExtra absent : tableau de synthese non insere dans le PDF")
 
