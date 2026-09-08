@@ -152,9 +152,9 @@ data.table::fwrite(monthly_out, file.path(dir_out, name_out_monthly), row.names 
 # "OBS" (all individual years are observed data, unlike the +2C/+4C
 # climatologies) and `year` is set from each file.
 
-individual_years_dir <- file.path(data_root, "Download_TerraClimate", "IndividualYears2001_2020")
+individual_years_dir <- file.path(data_root, "Download_TerraClimate", "IndividualYears2001_2025")
 year_min <- 2001
-year_max <- 2020
+year_max <- 2025
 
 yearly_out <- c()
 for (year in year_min:year_max) {

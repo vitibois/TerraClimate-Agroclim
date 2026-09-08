@@ -5,23 +5,23 @@
 #
 # Data source: https://www.climatologylab.org/terraclimate.html
 # Catalog: http://thredds.northwestknowledge.net:8080/thredds/catalog/TERRACLIMATE_ALL/data/catalog.html
-
 source("R/config.R")
 
 setwd(file.path(data_root, "Download_TerraClimate"))
-
 terraclimate_base_url <- "https://climate.northwestknowledge.net/TERRACLIMATE-DATA/"
 terraclimate_prefix <- "TerraClimate"
 
-year_min <- 2001
-year_max <- 2020
+year_min <- 2021
+year_max <- 2025
 
 # Variables to download
-my_vars <- c("tmin", "tmax", "vpd", "pet", "ppt")
+#my_vars <- c("tmin", "tmax", "vpd", "pet", "ppt")
+my_vars <- c("tmin", "tmax",  "pet", "ppt")
 
 terraclimate_url <- function(year, var) {
   paste0(terraclimate_base_url, terraclimate_prefix, "_", var, "_", year, ".nc")
 }
+
 
 for (year in year_min:year_max) {
   t_start <- Sys.time()
